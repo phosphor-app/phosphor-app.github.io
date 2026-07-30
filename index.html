@@ -1,341 +1,902 @@
-<title>PyForge — Code on your handheld</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>PyForge ASM — Assembly, Binary &amp; BASIC in your browser</title>
+<meta name="description" content="A bare-metal code playground. Write and run x86-64 assembly, decode binary, and run BASIC — entirely in your browser, no install." />
 <style>
   :root {
-    --base:#1e1e2e; --mantle:#181825; --crust:#11111b;
-    --surface:#313244; --overlay:#45475a; --line:#313244;
-    --text:#cdd6f4; --subtext:#bac2de; --muted:#9399b2;
-    --blue:#89b4fa; --green:#a6e3a1; --mauve:#cba6f7; --peach:#fab387;
-    --pink:#f5c2e7; --red:#f38ba8; --yellow:#f9e2af; --teal:#94e2d5; --sky:#89dceb; --lav:#b4befe;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
-    --maxw: 1120px;
+    --bg:      #0b0d14;
+    --bg2:     #0e1018;
+    --panel:   #12141d;
+    --panel2:  #161925;
+    --grid:    #1e2233;
+    --border:  #232838;
+    --fg:      #c8d0e2;
+    --dim:     #7d879e;
+    --faint:   #4c5468;
+    --amber:   #ffb454;   /* the accent — assembly / phosphor */
+    --amber-d: #d98a2b;
+    --cyan:    #62b6c8;   /* data / addresses */
+    --green:   #7ee787;   /* run / success */
+    --red:     #ff6b6b;   /* errors */
+    --violet:  #9d8cff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
   * { box-sizing: border-box; }
+  html, body { margin: 0; }
   body {
-    margin:0; background:var(--base); color:var(--text);
-    font-family:var(--sans); line-height:1.6;
-    -webkit-font-smoothing:antialiased;
-    background-image:
-      radial-gradient(60rem 40rem at 80% -10%, rgba(137,180,250,.16), transparent 60%),
-      radial-gradient(50rem 35rem at 0% 8%, rgba(166,227,161,.10), transparent 55%);
-    background-attachment:fixed;
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(255,180,84,0.06), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(98,182,200,0.05), transparent 55%),
+      var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    min-height: 100vh;
   }
-  a { color:inherit; }
-  img { max-width:100%; }
-  .wrap { max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+  a { color: var(--amber); text-decoration: none; }
+  a:hover { text-decoration: underline; }
 
-  /* ---- nav ---- */
-  nav {
-    position:sticky; top:0; z-index:20;
-    backdrop-filter:blur(10px);
-    background:linear-gradient(var(--base), rgba(30,30,46,.72));
-    border-bottom:1px solid var(--line);
+  /* ---------- header ---------- */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(255,180,84,0.03), transparent);
+    padding: 18px clamp(14px, 4vw, 40px) 16px;
   }
-  .nav-in { display:flex; align-items:center; justify-content:space-between; height:64px; }
-  .brand { display:flex; align-items:center; gap:12px; font-family:var(--mono); font-weight:700; letter-spacing:-.01em; font-size:1.15rem; }
-  .logo { width:34px; height:34px; border-radius:9px; background:var(--crust); border:1px solid var(--surface); display:grid; place-items:center; flex:0 0 auto; }
-  .brand b { color:var(--text); }
-  .brand .cur { color:var(--green); }
-
-  .btn {
-    font-family:var(--mono); font-weight:600; font-size:.95rem;
-    display:inline-flex; align-items:center; gap:.55em;
-    padding:.72em 1.2em; border-radius:11px; cursor:pointer;
-    text-decoration:none; border:1px solid transparent; transition:transform .12s ease, background .12s ease, box-shadow .12s ease;
+  .brand { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .logo {
+    font-family: var(--mono);
+    font-size: 26px; font-weight: 700; letter-spacing: -0.5px;
+    color: var(--fg);
+    display: inline-flex; align-items: center; gap: 10px;
   }
-  .btn-primary { background:var(--green); color:#0c0c14; box-shadow:0 8px 30px rgba(166,227,161,.22); }
-  .btn-primary:hover { transform:translateY(-2px); box-shadow:0 12px 36px rgba(166,227,161,.32); }
-  .btn-ghost { background:var(--surface); color:var(--text); border-color:var(--overlay); }
-  .btn-ghost:hover { transform:translateY(-2px); background:var(--overlay); }
-  .btn-sm { padding:.5em .95em; font-size:.85rem; }
-
-  /* ---- hero ---- */
-  .hero { padding:72px 0 40px; }
-  .hero-grid { display:grid; grid-template-columns:1.05fr .95fr; gap:48px; align-items:center; }
-  .eyebrow {
-    font-family:var(--mono); font-size:.78rem; letter-spacing:.18em; text-transform:uppercase;
-    color:var(--blue); display:inline-flex; align-items:center; gap:.7em; margin:0 0 22px;
-    border:1px solid var(--surface); padding:.4em .8em; border-radius:999px; background:var(--mantle);
+  .logo .caret {
+    color: var(--amber);
+    text-shadow: 0 0 18px rgba(255,180,84,0.45);
   }
-  .eyebrow .dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 10px var(--green); }
-  h1 {
-    font-size:clamp(2.4rem, 5.4vw, 4rem); line-height:1.03; letter-spacing:-.03em;
-    margin:0 0 22px; font-weight:800; text-wrap:balance;
+  .badge {
+    font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 2px;
+    color: var(--amber); border: 1px solid var(--amber-d);
+    padding: 3px 9px; border-radius: 5px; background: rgba(255,180,84,0.08);
   }
-  h1 .hl { color:var(--blue); }
-  .lede { font-size:1.16rem; color:var(--subtext); max-width:34em; margin:0 0 30px; }
-  .cta-row { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
-  .meta { font-family:var(--mono); font-size:.82rem; color:var(--muted); }
-  .meta b { color:var(--subtext); font-weight:600; }
+  .tagline { color: var(--dim); font-size: 14.5px; margin-top: 8px; max-width: 72ch; }
+  .tagline b { color: var(--fg); font-weight: 600; }
+  .meta { margin-top: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--faint); letter-spacing: 0.4px; }
+  .meta span { color: var(--cyan); }
 
-  /* ---- device mockup ---- */
-  .device-wrap { position:relative; justify-self:center; }
-  .device {
-    width:340px; max-width:100%; border-radius:30px; padding:12px;
-    background:linear-gradient(160deg,#2a2a3c,#141420);
-    border:1px solid var(--overlay);
-    box-shadow:0 40px 80px -30px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.05);
+  /* ---------- workspace ---------- */
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 16px;
+    padding: 16px clamp(14px, 4vw, 40px) 28px;
+    align-items: start;
   }
-  .screen { border-radius:20px; overflow:hidden; background:var(--base); border:1px solid #0c0c14; }
-  .app-bar { display:flex; align-items:center; gap:8px; padding:9px 11px; background:var(--mantle); border-bottom:1px solid var(--line); }
-  .lang-pill { font-family:var(--mono); font-size:.72rem; color:var(--blue); background:var(--surface); padding:.3em .6em; border-radius:7px; border:1px solid var(--overlay); }
-  .fname { font-family:var(--mono); font-size:.72rem; color:var(--muted); flex:1; }
-  .run { font-family:var(--mono); font-size:.72rem; font-weight:700; color:#0c0c14; background:var(--green); padding:.3em .6em; border-radius:7px; }
-  .code { font-family:var(--mono); font-size:.76rem; line-height:1.75; padding:12px 12px 14px; overflow-x:auto; }
-  .code .ln { display:block; white-space:pre; }
-  .code .g { color:var(--overlay); user-select:none; }
-  .k { color:var(--mauve); } .fn { color:var(--blue); } .s { color:var(--green); }
-  .n { color:var(--peach); } .c { color:var(--muted); font-style:italic; } .p { color:var(--subtext); }
-  .out-head { font-family:var(--mono); font-size:.64rem; letter-spacing:.14em; color:var(--muted); padding:8px 12px 2px; background:var(--crust); border-top:1px solid var(--line); }
-  .out { font-family:var(--mono); font-size:.76rem; line-height:1.7; color:var(--text); background:var(--crust); padding:2px 12px 14px; white-space:pre; overflow-x:auto; }
-  .out .fin { color:var(--muted); }
-  .glow { position:absolute; inset:-30px -20px; z-index:-1; background:radial-gradient(closest-side, rgba(137,180,250,.28), transparent 70%); filter:blur(10px); }
-  .cur { animation:blink 1.1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity:0; } }
+  @media (max-width: 940px) { .workspace { grid-template-columns: 1fr; } }
 
-  /* ---- section scaffolding ---- */
-  section { padding:64px 0; }
-  .sec-label { font-family:var(--mono); font-size:.78rem; letter-spacing:.16em; text-transform:uppercase; color:var(--green); margin:0 0 12px; }
-  .sec-title { font-size:clamp(1.6rem,3.4vw,2.4rem); letter-spacing:-.02em; margin:0 0 14px; font-weight:800; text-wrap:balance; }
-  .sec-sub { color:var(--subtext); max-width:44em; margin:0; font-size:1.05rem; }
-
-  /* ---- languages ---- */
-  .langs { display:flex; flex-wrap:wrap; gap:12px; margin-top:34px; }
-  .chip {
-    font-family:var(--mono); font-size:.92rem; display:inline-flex; align-items:center; gap:.6em;
-    padding:.6em 1em; border-radius:11px; background:var(--mantle); border:1px solid var(--line);
-    transition:transform .12s ease, border-color .12s ease;
-  }
-  .chip:hover { transform:translateY(-2px); border-color:var(--overlay); }
-  .chip .d { width:9px; height:9px; border-radius:50%; flex:0 0 auto; }
-  .chip.edit { color:var(--muted); }
-  .chip .tag { font-size:.68rem; color:var(--muted); border:1px solid var(--line); padding:.1em .45em; border-radius:6px; }
-
-  /* ---- features ---- */
-  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:38px; }
   .card {
-    background:linear-gradient(180deg, var(--mantle), rgba(24,24,37,.6));
-    border:1px solid var(--line); border-radius:16px; padding:24px;
-    transition:transform .14s ease, border-color .14s ease;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
   }
-  .card:hover { transform:translateY(-3px); border-color:var(--overlay); }
-  .ic { width:40px; height:40px; border-radius:11px; display:grid; place-items:center; margin-bottom:16px; border:1px solid var(--surface); background:var(--crust); }
-  .card h3 { margin:0 0 8px; font-size:1.12rem; letter-spacing:-.01em; }
-  .card p { margin:0; color:var(--subtext); font-size:.96rem; }
-
-  /* ---- download ---- */
-  .download { border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--mantle); }
-  .dl-grid { display:grid; grid-template-columns:1fr 1fr; gap:48px; align-items:center; }
-  .steps { list-style:none; counter-reset:s; margin:26px 0 0; padding:0; display:grid; gap:16px; }
-  .steps li { counter-increment:s; display:grid; grid-template-columns:auto 1fr; gap:16px; align-items:start; }
-  .steps li::before {
-    content:counter(s); font-family:var(--mono); font-weight:700; color:var(--blue);
-    width:34px; height:34px; border-radius:9px; display:grid; place-items:center;
-    background:var(--crust); border:1px solid var(--surface); font-size:.95rem;
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 12px;
+    background: var(--panel2);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.6px; color: var(--dim);
   }
-  .steps b { display:block; }
-  .steps span { color:var(--subtext); font-size:.95rem; }
-  .dl-card { text-align:center; background:var(--base); border:1px solid var(--line); border-radius:20px; padding:34px 28px; }
-  .dl-card .logo-lg { width:76px; height:76px; margin:0 auto 16px; border-radius:19px; background:var(--crust); border:1px solid var(--surface); display:grid; place-items:center; }
-  .dl-card h3 { margin:0 0 4px; font-size:1.35rem; }
-  .dl-card .ver { font-family:var(--mono); color:var(--muted); font-size:.85rem; margin-bottom:20px; }
-  .dl-card .btn { width:100%; justify-content:center; font-size:1.05rem; padding:.9em 1.2em; }
-  .dl-note { font-family:var(--mono); font-size:.76rem; color:var(--muted); margin-top:14px; }
 
-  /* ---- footer ---- */
-  footer { padding:40px 0 60px; color:var(--muted); }
-  .foot-in { display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:center; font-size:.9rem; }
-  .foot-in .mono { font-family:var(--mono); }
-  .foot-in a { color:var(--blue); text-decoration:none; }
-
-  :focus-visible { outline:2px solid var(--blue); outline-offset:3px; border-radius:6px; }
-
-  @media (max-width:860px){
-    .hero-grid, .dl-grid { grid-template-columns:1fr; }
-    .hero { padding:48px 0 24px; }
-    .device-wrap { order:-1; }
-    .cards { grid-template-columns:1fr; }
-    .brand span.tag { display:none; }
+  /* ---------- tabs ---------- */
+  .tabs { display: flex; align-items: center; gap: 6px; padding: 8px 8px; flex-wrap: wrap; }
+  .tab {
+    font-family: var(--mono); font-size: 12.5px; font-weight: 700; letter-spacing: 1px;
+    color: var(--dim);
+    background: transparent; border: 1px solid transparent; border-radius: 8px;
+    padding: 8px 14px; cursor: pointer; text-transform: uppercase;
   }
-  @media (prefers-reduced-motion: reduce){
-    * { animation:none !important; transition:none !important; }
+  .tab:hover { color: var(--fg); background: var(--panel2); }
+  .tab.active { color: var(--amber); border-color: var(--amber-d); background: rgba(255,180,84,0.08); }
+  .spacer { flex: 1 1 auto; }
+
+  select, button.ctl {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--panel2); color: var(--fg);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 11px; cursor: pointer;
+  }
+  select:hover, button.ctl:hover { border-color: var(--faint); }
+  button.run {
+    font-family: var(--mono); font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    font-size: 12.5px; color: #0b0d14;
+    background: var(--green); border: 0; border-radius: 8px;
+    padding: 9px 18px; cursor: pointer;
+    box-shadow: 0 0 0 1px rgba(126,231,135,0.3), 0 4px 18px rgba(126,231,135,0.15);
+  }
+  button.run:hover { filter: brightness(1.08); }
+  button.run:active { transform: translateY(1px); }
+
+  /* ---------- editor ---------- */
+  .editor {
+    display: flex; height: clamp(300px, 46vh, 560px);
+    border-top: 1px solid var(--border);
+    background: var(--bg2);
+  }
+  .gutter {
+    flex: 0 0 auto; min-width: 46px;
+    padding: 12px 10px 12px 0;
+    text-align: right;
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.5;
+    color: var(--faint); background: var(--panel);
+    border-right: 1px solid var(--border);
+    overflow: hidden; white-space: pre; user-select: none;
+  }
+  .code-area { position: relative; flex: 1 1 auto; overflow: hidden; }
+  #hl, #code {
+    position: absolute; inset: 0; margin: 0;
+    padding: 12px 14px;
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.5;
+    tab-size: 4; -moz-tab-size: 4;
+    white-space: pre; overflow: auto;
+    border: 0; outline: none;
+  }
+  #hl { z-index: 1; pointer-events: none; color: var(--fg); }
+  #code {
+    z-index: 2; background: transparent; color: transparent; caret-color: var(--amber);
+    resize: none;
+  }
+  #code::selection { background: rgba(255,180,84,0.25); }
+  /* token colors */
+  .t-cmt { color: var(--faint); font-style: italic; }
+  .t-str { color: var(--green); }
+  .t-reg { color: var(--amber); }
+  .t-ins { color: var(--cyan); font-weight: 600; }
+  .t-dir { color: var(--violet); }
+  .t-lbl { color: #ffd27a; font-weight: 600; }
+  .t-num { color: #ff9e64; }
+  .t-kw  { color: var(--cyan); font-weight: 600; }
+  .t-fn  { color: var(--violet); }
+
+  /* ---------- io / console ---------- */
+  .io-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; border-top: 1px solid var(--border); background: var(--panel2);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 1.6px; color: var(--dim);
+  }
+  .io-head .status { color: var(--faint); letter-spacing: 0.5px; text-transform: none; font-weight: 500; }
+  .stdin-wrap { border-top: 1px solid var(--border); background: #090b11; }
+  .stdin-wrap.collapsed { display: none; }
+  #stdin {
+    width: 100%; height: 64px; resize: vertical; border: 0; outline: none;
+    background: transparent; color: var(--fg);
+    font-family: var(--mono); font-size: 12.5px; padding: 8px 12px;
+  }
+  #output {
+    margin: 0; padding: 12px 14px; min-height: 120px; max-height: 320px; overflow: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word;
+    background: #090b11; color: var(--fg);
+  }
+  #output .ok { color: var(--green); }
+  #output .err { color: var(--red); }
+  #output .meta { color: var(--faint); }
+  #output:empty::before { content: "\203A program output appears here"; color: var(--faint); }
+
+  .mini {
+    font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--dim); background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; padding: 5px 9px; cursor: pointer;
+  }
+  .mini:hover { color: var(--fg); border-color: var(--faint); }
+  .mini.on { color: var(--amber); border-color: var(--amber-d); }
+
+  /* ---------- side: registers ---------- */
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .regs { padding: 10px 12px 12px; }
+  .reg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+  .reg {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    font-family: var(--mono); font-size: 12px; padding: 3px 4px; border-radius: 5px;
+  }
+  .reg .rn { color: var(--dim); }
+  .reg .rv { color: var(--cyan); font-variant-numeric: tabular-nums; }
+  .reg.nz .rn { color: var(--amber); }
+  .reg.nz .rv { color: var(--fg); }
+  .reg.changed { background: rgba(255,180,84,0.12); }
+
+  .flags { display: flex; gap: 7px; padding: 10px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .flag {
+    font-family: var(--mono); font-size: 11.5px; font-weight: 700; letter-spacing: 1px;
+    color: var(--faint); border: 1px solid var(--border); border-radius: 6px; padding: 4px 9px;
+  }
+  .flag.set { color: var(--green); border-color: rgba(126,231,135,0.4); background: rgba(126,231,135,0.08); }
+  .steps { padding: 8px 12px; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+  .steps b { color: var(--cyan); font-weight: 600; }
+
+  /* ---------- reference ---------- */
+  .ref { padding: 12px 14px; font-size: 13px; }
+  .ref h4 { margin: 0 0 6px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px; color: var(--amber); }
+  .ref h4:not(:first-child) { margin-top: 16px; }
+  .ref table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+  .ref td { padding: 3px 6px 3px 0; vertical-align: top; }
+  .ref td:first-child { color: var(--cyan); white-space: nowrap; }
+  .ref td:last-child { color: var(--dim); }
+  .ref p { margin: 4px 0; color: var(--dim); }
+  .ref code { color: var(--amber); font-family: var(--mono); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px clamp(14px, 4vw, 40px);
+    color: var(--faint); font-size: 13px;
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  footer .mono { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.4px; }
+  kbd {
+    font-family: var(--mono); font-size: 11px; color: var(--fg);
+    background: var(--panel2); border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 5px;
   }
 </style>
-
-<nav>
-  <div class="wrap nav-in">
+</head>
+<body>
+  <header>
     <div class="brand">
-      <span class="logo" aria-hidden="true">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M6 7l5 5-5 5" stroke="#89b4fa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M13 17h5" stroke="#a6e3a1" stroke-width="2.4" stroke-linecap="round"/>
-        </svg>
-      </span>
-      <span><b>PyForge</b><span class="cur">_</span></span>
+      <span class="logo"><span class="caret">&gt;_</span> PyForge</span>
+      <span class="badge">ASM</span>
     </div>
-    <a class="btn btn-primary btn-sm" href="#download">Download</a>
-  </div>
-</nav>
+    <p class="tagline">
+      A bare-metal code playground. Write and run <b>x86-64 assembly</b>, take apart
+      <b>binary</b>, and run <b>BASIC</b> — the whole machine lives in your browser,
+      nothing to install and nothing leaves your computer.
+    </p>
+    <div class="meta">runs entirely client-side · <span>16 general-purpose registers</span> · a safe software CPU — <span>no real hardware is touched</span></div>
+  </header>
 
-<header class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <span class="eyebrow"><span class="dot"></span> free · offline · 12 languages</span>
-      <h1>Write and run code in a <span class="hl">dozen</span> languages.</h1>
-      <p class="lede">
-        PyForge is a full code editor with real interpreters built in — Python, C, C++,
-        Lua, Ruby, Scheme, BASIC, x86 Assembly and more. <b>Twelve languages</b>, all
-        running for real. Offline, free, no account. On Android and Mac.
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="#download">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="#0c0c14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Download PyForge
-        </a>
-        <span class="meta">for <b>Android</b>, <b>Mac</b>, <b>Windows</b> &amp; <b>Linux</b></span>
+  <main class="workspace">
+    <section class="card editor-col">
+      <div class="tabs">
+        <button class="tab active" data-lang="assembly">Assembly</button>
+        <button class="tab" data-lang="binary">Binary</button>
+        <button class="tab" data-lang="basic">BASIC</button>
+        <span class="spacer"></span>
+        <select id="examples" title="Load an example"></select>
+        <button class="ctl" id="btn-clear" title="Clear the editor">Clear</button>
+        <button class="run" id="btn-run" title="Run (Ctrl/Cmd + Enter)">&#9654; Run</button>
       </div>
-    </div>
 
-    <div class="device-wrap">
-      <div class="glow" aria-hidden="true"></div>
-      <div class="device" role="img" aria-label="PyForge editor running a Python program on a phone">
-        <div class="screen">
-          <div class="app-bar">
-            <span class="lang-pill">Python ▾</span>
-            <span class="fname">squares.py</span>
-            <span class="run">▶ Run</span>
-          </div>
-          <div class="code">
-<span class="ln"><span class="g">1  </span><span class="c"># squares.py</span></span>
-<span class="ln"><span class="g">2  </span><span class="k">for</span> i <span class="k">in</span> <span class="fn">range</span><span class="p">(</span><span class="n">1</span><span class="p">,</span> <span class="n">6</span><span class="p">):</span></span>
-<span class="ln"><span class="g">3  </span>    <span class="fn">print</span><span class="p">(</span><span class="s">f"{i}² = {i*i}"</span><span class="p">)</span></span>
-<span class="ln"><span class="g">4  </span><span class="fn">print</span><span class="p">(</span><span class="s">"Hello from PyForge!"</span><span class="p">)</span></span>
-          </div>
-          <div class="out-head">OUTPUT</div>
-          <div class="out">1² = 1
-2² = 4
-3² = 9
-4² = 16
-5² = 25
-Hello from PyForge!
-<span class="fin">[finished in 0.01s]</span></div>
+      <div class="editor">
+        <div class="gutter" id="gutter">1</div>
+        <div class="code-area">
+          <pre class="hl" id="hl" aria-hidden="true"></pre>
+          <textarea id="code" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off"></textarea>
         </div>
       </div>
-    </div>
-  </div>
-</header>
 
-<section id="languages">
-  <div class="wrap">
-    <p class="sec-label">Twelve languages</p>
-    <h2 class="sec-title">Every one of them runs on the device.</h2>
-    <p class="sec-sub">Real interpreters bundled in — CPython, Lua, mruby, PicoC, s7, MY-BASIC and a hand-built x86 emulator. Nothing phones home.</p>
-    <div class="langs">
-      <span class="chip"><span class="d" style="background:var(--blue)"></span>Python</span>
-      <span class="chip"><span class="d" style="background:var(--yellow)"></span>JavaScript</span>
-      <span class="chip"><span class="d" style="background:var(--peach)"></span>Java</span>
-      <span class="chip"><span class="d" style="background:var(--sky)"></span>C</span>
-      <span class="chip edit"><span class="d" style="background:var(--overlay)"></span>C++ <span class="tag">edit</span></span>
-      <span class="chip"><span class="d" style="background:var(--lav)"></span>Lua</span>
-      <span class="chip"><span class="d" style="background:var(--red)"></span>Ruby</span>
-      <span class="chip"><span class="d" style="background:var(--teal)"></span>Scheme</span>
-      <span class="chip"><span class="d" style="background:var(--green)"></span>BASIC</span>
-      <span class="chip"><span class="d" style="background:var(--peach)"></span>HTML/CSS</span>
-      <span class="chip"><span class="d" style="background:var(--mauve)"></span>Assembly</span>
-      <span class="chip"><span class="d" style="background:var(--pink)"></span>Binary</span>
-    </div>
-  </div>
-</section>
+      <div class="io-head">
+        <span>Input</span>
+        <button class="mini" id="btn-stdin" title="Give the program standard input">stdin &#9662;</button>
+      </div>
+      <div class="stdin-wrap collapsed" id="stdin-wrap">
+        <textarea id="stdin" spellcheck="false" placeholder="Standard input — what the program reads (assembly sys_read, BASIC INPUT)…"></textarea>
+      </div>
 
-<section id="features">
-  <div class="wrap">
-    <p class="sec-label">What's inside</p>
-    <h2 class="sec-title">A real editor, not a toy.</h2>
-    <div class="cards">
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M8 6l-5 6 5 6M16 6l5 6-5 6" stroke="#89b4fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <h3>Runs on your device</h3>
-        <p>Real interpreters are packed into the app. Hit Run and your code executes right there — no internet, no server, no account.</p>
+      <div class="io-head">
+        <span>Output</span>
+        <span class="status" id="status">ready</span>
       </div>
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="#a6e3a1" stroke-width="2"/><path d="M3 9h18" stroke="#a6e3a1" stroke-width="2"/></svg></div>
-        <h3>A proper editor</h3>
-        <p>Syntax highlighting, bracket matching, auto-indent, autocomplete and a dark theme for every language — a real code editor, not a text box.</p>
-      </div>
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 5h16M4 12h16M4 19h10" stroke="#cba6f7" stroke-width="2" stroke-linecap="round"/></svg></div>
-        <h3>Your files, on you</h3>
-        <p>A built-in library saves, opens, renames and deletes your programs. Import from the device, export back out, share to any app.</p>
-      </div>
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 5l11 7-11 7V5z" fill="#a6e3a1"/></svg></div>
-        <h3>Run, Stop, Input</h3>
-        <p>Feed a program standard input, watch its output live, and stop a runaway loop with one click instead of force-quitting.</p>
-      </div>
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="12" r="2.4" stroke="#fab387" stroke-width="2"/><circle cx="18" cy="6" r="2.4" stroke="#fab387" stroke-width="2"/><circle cx="18" cy="18" r="2.4" stroke="#fab387" stroke-width="2"/><path d="M8 11l8-4M8 13l8 4" stroke="#fab387" stroke-width="2"/></svg></div>
-        <h3>Share anywhere</h3>
-        <p>Copy your code or output to the clipboard, or send it through your system's share menu to messages, Drive, or anywhere else.</p>
-      </div>
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="6" y="3" width="12" height="18" rx="3" stroke="#89dceb" stroke-width="2"/><path d="M11 18h2" stroke="#89dceb" stroke-width="2" stroke-linecap="round"/></svg></div>
-        <h3>Runs everywhere</h3>
-        <p>The same editor on Android, Mac, Windows and Linux — your phone, tablet or handheld, and your desktop. Your code and workflow feel identical everywhere.</p>
-      </div>
-      <div class="card">
-        <div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z" stroke="#f5c2e7" stroke-width="2" stroke-linejoin="round"/><path d="M3 8l9 5 9-5M12 13v8" stroke="#f5c2e7" stroke-width="2" stroke-linejoin="round"/></svg></div>
-        <h3>Bring your own libraries</h3>
-        <p>On the desktop apps, install Python (<code>pip</code>) and Ruby (<code>gem</code>) packages right from the editor — type a name, it downloads, and your code can <code>import</code> it.</p>
-      </div>
-    </div>
-  </div>
-</section>
+      <pre id="output"></pre>
+    </section>
 
-<section id="download" class="download">
-  <div class="wrap dl-grid">
-    <div>
-      <p class="sec-label">Get it</p>
-      <h2 class="sec-title">Install in about a minute.</h2>
-      <p class="sec-sub">Free to download and install yourself. Both builds are unsigned, so your device asks permission the first time.</p>
-      <ol class="steps">
-        <li><div><b>Download for your device</b><span>Grab the Android <code>.apk</code> or the Mac <code>.dmg</code> from the buttons.</span></div></li>
-        <li><div><b>Allow it to open</b><span>On Android, allow installs from this source. On Mac, right-click the app and choose Open.</span></div></li>
-        <li><div><b>Pick a language and Run</b><span>Your first program is already loaded — hit Run and you're off.</span></div></li>
-      </ol>
-    </div>
-    <div class="dl-card">
-      <div class="logo-lg" aria-hidden="true">
-        <svg width="42" height="42" viewBox="0 0 24 24" fill="none">
-          <path d="M6 7l5 5-5 5" stroke="#89b4fa" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M13 17h5" stroke="#a6e3a1" stroke-width="2.4" stroke-linecap="round"/>
-        </svg>
+    <aside class="side">
+      <div class="card" id="cpu-card">
+        <div class="card-head"><span>CPU state</span><span id="cpu-note">idle</span></div>
+        <div class="regs"><div class="reg-grid" id="reg-grid"></div></div>
+        <div class="flags" id="flags"></div>
+        <div class="steps" id="steps">executed <b>0</b> instructions</div>
       </div>
-      <h3>PyForge</h3>
-      <p class="ver">v1.0 · free · offline</p>
-      <a class="btn btn-primary" href="https://github.com/pyforge-app/pyforge/releases/download/v1.0/PyForge.apk" download>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="#0c0c14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Android&nbsp;&nbsp;.apk
-      </a>
-      <a class="btn btn-ghost" style="margin-top:10px" href="https://github.com/pyforge-app/pyforge/releases/download/v1.0/PyForge-mac.dmg">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="#cdd6f4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Mac&nbsp;&nbsp;.dmg
-      </a>
-      <a class="btn btn-ghost" style="margin-top:10px" href="https://github.com/pyforge-app/pyforge/releases/download/v1.0/PyForge-windows.zip">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="#cdd6f4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Windows&nbsp;&nbsp;.zip
-      </a>
-      <a class="btn btn-ghost" style="margin-top:10px" href="https://github.com/pyforge-app/pyforge/releases/download/v1.0/PyForge-linux.AppImage">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="#cdd6f4" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Linux&nbsp;&nbsp;.AppImage
-      </a>
-      <p class="dl-note">Android 7+ &nbsp;·&nbsp; macOS (Apple&nbsp;Silicon) &nbsp;·&nbsp; Windows&nbsp;10+ (x64) &nbsp;·&nbsp; Linux (x64) &nbsp;·&nbsp; unsigned</p>
-    </div>
-  </div>
-</section>
 
-<footer>
-  <div class="wrap foot-in">
-    <span class="mono">PyForge — write &amp; run code in a dozen languages.</span>
-    <span>Free for Android, Mac, Windows &amp; Linux · <a href="#download">pyforge-app.github.io</a></span>
-  </div>
-</footer>
+      <div class="card">
+        <div class="card-head"><span id="ref-title">Reference</span></div>
+        <div class="ref" id="ref"></div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div>Part of <a href="https://github.com/pyforge-app/pyforge">PyForge</a> — a free, open code editor.</div>
+    <div class="mono">Ctrl / <kbd>&#8984;</kbd> + <kbd>Enter</kbd> to run · Tab inserts spaces · code is saved in your browser</div>
+  </footer>
+
+  <script src="asm.js"></script>
+  <script src="basic.js"></script>
+  <script>
+  (function () {
+    "use strict";
+    var ta = document.getElementById("code");
+    var hl = document.getElementById("hl");
+    var gutter = document.getElementById("gutter");
+    var out = document.getElementById("output");
+    var statusEl = document.getElementById("status");
+    var stdinEl = document.getElementById("stdin");
+
+    var lang = "assembly";
+
+    // ---------------- starter programs ----------------
+    var STARTERS = {
+      assembly: [
+        "; x86-64 assembly (NASM syntax) — runs in PyForge's software CPU.",
+        "; Registers on the right update after every run.",
+        "section .data",
+        "    msg db \"Hello from PyForge!\", 0xa",
+        "    len equ $ - msg",
+        "",
+        "section .text",
+        "    global _start",
+        "",
+        "_start:",
+        "    mov rax, 1          ; sys_write",
+        "    mov rdi, 1          ; stdout",
+        "    mov rsi, msg",
+        "    mov rdx, len",
+        "    syscall",
+        "",
+        "    mov rax, 60         ; sys_exit",
+        "    xor rdi, rdi",
+        "    syscall",
+        ""
+      ].join("\n"),
+      binary: [
+        "# Binary toolkit — one item per line. Each line is decoded/encoded:",
+        "#   bits (8 per byte) | a decimal number | 0xHEX | or \"text\"",
+        "01001000 01101001 00100001",
+        "72",
+        "0x41",
+        "\"PyForge\"",
+        ""
+      ].join("\n"),
+      basic: [
+        "REM BASIC — structured, no line numbers needed",
+        "FOR i = 1 TO 5",
+        "    PRINT i, \"squared is\", i * i",
+        "NEXT i",
+        "PRINT \"Hello from PyForge!\"",
+        ""
+      ].join("\n")
+    };
+
+    // ---------------- examples ----------------
+    var EXAMPLES = {
+      assembly: {
+        "Hello world": STARTERS.assembly,
+        "Add & subtract (watch the registers)": [
+          "; Arithmetic — check rax/rbx/rcx on the right after running.",
+          "section .text",
+          "global _start",
+          "_start:",
+          "    mov rax, 15",
+          "    mov rbx, 27",
+          "    add rax, rbx        ; rax = 42",
+          "    mov rdx, rax        ; keep 42 in rdx",
+          "    mov rcx, rax",
+          "    sub rcx, 2          ; rcx = 40",
+          "    imul rbx, 3         ; rbx = 81",
+          "    mov rax, 60",
+          "    xor rdi, rdi",
+          "    syscall",
+          ""
+        ].join("\n"),
+        "Countdown loop (5..1)": [
+          "; Print 5,4,3,2,1 using a loop, dec and jnz.",
+          "section .data",
+          "    nl db 0xa",
+          "    digit db \"0\"",
+          "section .text",
+          "global _start",
+          "_start:",
+          "    mov rcx, 5          ; counter",
+          "loop_top:",
+          "    mov rbx, rcx",
+          "    add rbx, 48         ; to ASCII digit",
+          "    mov [digit], bl",
+          "    mov rax, 1          ; sys_write",
+          "    mov rdi, 1",
+          "    mov rsi, digit",
+          "    mov rdx, 1",
+          "    syscall",
+          "    mov rax, 1",
+          "    mov rdi, 1",
+          "    mov rsi, nl",
+          "    mov rdx, 1",
+          "    syscall",
+          "    dec rcx",
+          "    jnz loop_top",
+          "    mov rax, 60",
+          "    xor rdi, rdi",
+          "    syscall",
+          ""
+        ].join("\n"),
+        "Sum 1..10 (exit code 55 in rdi)": [
+          "; Add 1+2+...+10.  The total 55 ends up in rdi (the exit code).",
+          "section .text",
+          "global _start",
+          "_start:",
+          "    xor rax, rax        ; sum = 0",
+          "    mov rcx, 1          ; i = 1",
+          "next:",
+          "    add rax, rcx        ; sum += i",
+          "    inc rcx",
+          "    cmp rcx, 10",
+          "    jle next",
+          "    mov rdi, rax        ; rdi = 55 (exit code)",
+          "    mov rax, 60         ; sys_exit",
+          "    syscall",
+          ""
+        ].join("\n"),
+        "Compare & flags": [
+          "; cmp sets the flags (ZF/SF/CF/OF) shown on the right.",
+          "section .text",
+          "global _start",
+          "_start:",
+          "    mov rax, 5",
+          "    mov rbx, 5",
+          "    cmp rax, rbx        ; equal -> ZF set",
+          "    mov rax, 60",
+          "    xor rdi, rdi",
+          "    syscall",
+          ""
+        ].join("\n")
+      },
+      binary: {
+        "Bits, number, hex, text": STARTERS.binary,
+        "Decode a hidden message": [
+          "# Each 8-bit group is one letter — run to reveal it.",
+          "01010000 01111001 01000110",
+          "01101111 01110010 01100111 01100101",
+          ""
+        ].join("\n"),
+        "Encode your name": [
+          "# Text -> binary + hex.  Change the word and run.",
+          "\"assembly\"",
+          "\"PyForge rules\"",
+          ""
+        ].join("\n"),
+        "Number bases": [
+          "# The same value in three bases:",
+          "255",
+          "0xFF",
+          "11111111",
+          ""
+        ].join("\n")
+      },
+      basic: {
+        "Squares (FOR / NEXT)": STARTERS.basic,
+        "FizzBuzz (IF / ELSEIF / ENDIF)": [
+          "FOR n = 1 TO 20",
+          "    IF n MOD 15 = 0 THEN",
+          "        PRINT \"FizzBuzz\"",
+          "    ELSEIF n MOD 3 = 0 THEN",
+          "        PRINT \"Fizz\"",
+          "    ELSEIF n MOD 5 = 0 THEN",
+          "        PRINT \"Buzz\"",
+          "    ELSE",
+          "        PRINT n",
+          "    ENDIF",
+          "NEXT n",
+          ""
+        ].join("\n"),
+        "Countdown (WHILE / WEND)": [
+          "n = 5",
+          "WHILE n > 0",
+          "    PRINT \"T-minus\"; n",
+          "    n = n - 1",
+          "WEND",
+          "PRINT \"Liftoff!\"",
+          ""
+        ].join("\n"),
+        "Times table": [
+          "FOR a = 1 TO 5",
+          "    FOR b = 1 TO 5",
+          "        PRINT a * b,",
+          "    NEXT b",
+          "    PRINT \"\"",
+          "NEXT a",
+          ""
+        ].join("\n"),
+        "Ask a name (uses stdin)": [
+          "REM type a name in the stdin box, then Run",
+          "INPUT \"What is your name? \"; nm",
+          "PRINT \"Hello, \" + nm + \"!\"",
+          "PRINT \"Your name has \" + STR(LEN(nm)) + \" letters.\"",
+          ""
+        ].join("\n"),
+        "Functions demo": [
+          "PRINT \"abs(-9)   =\", ABS(-9)",
+          "PRINT \"sqr(144)  =\", SQR(144)",
+          "PRINT \"upper     =\", UCASE(\"hello\")",
+          "PRINT \"left 3    =\", LEFT(\"assembly\", 3)",
+          "PRINT \"pi        =\", PI",
+          ""
+        ].join("\n")
+      }
+    };
+
+    // ---------------- syntax highlighting ----------------
+    function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+    var ASM_REGS = {};
+    ("rax rbx rcx rdx rsi rdi rbp rsp r8 r9 r10 r11 r12 r13 r14 r15 " +
+     "eax ebx ecx edx esi edi ebp esp r8d r9d r10d r11d r12d r13d r14d r15d " +
+     "ax bx cx dx si di bp sp r8w r9w r10w r11w r12w r13w r14w r15w " +
+     "al bl cl dl sil dil bpl spl ah bh ch dh r8b r9b r10b r11b r12b r13b r14b r15b")
+      .split(" ").forEach(function (r) { ASM_REGS[r] = 1; });
+    var ASM_INS = {};
+    ("mov movzx movsx lea add sub imul mul idiv div inc dec neg and or xor not " +
+     "shl shr sar sal cmp test jmp je jz jne jnz jg jge jl jle ja jae jb jbe js jns jo jno jc jnc " +
+     "call ret push pop syscall cdq cqo cwd rdtsc nop loop sete setne setg setl")
+      .split(" ").forEach(function (i) { ASM_INS[i] = 1; });
+    var ASM_DIR = { section: 1, global: 1, extern: 1, db: 1, dw: 1, dd: 1, dq: 1,
+      equ: 1, resb: 1, resw: 1, resd: 1, resq: 1, times: 1 };
+
+    function hlAsm(line) {
+      var o = "", i = 0, n = line.length;
+      while (i < n) {
+        var c = line[i];
+        if (c === ";") { o += '<span class="t-cmt">' + esc(line.slice(i)) + "</span>"; return o; }
+        if (c === '"' || c === "'") {
+          var q = c, j = i + 1, s = c;
+          while (j < n && line[j] !== q) { s += line[j]; j++; }
+          if (j < n) { s += line[j]; j++; }
+          o += '<span class="t-str">' + esc(s) + "</span>"; i = j; continue;
+        }
+        if (/[A-Za-z_.$]/.test(c)) {
+          var w = "", k = i;
+          while (k < n && /[A-Za-z0-9_.$]/.test(line[k])) { w += line[k]; k++; }
+          var lw = w.toLowerCase(), cls = null;
+          if (line[k] === ":") cls = "t-lbl";
+          else if (ASM_REGS[lw]) cls = "t-reg";
+          else if (ASM_INS[lw]) cls = "t-ins";
+          else if (ASM_DIR[lw]) cls = "t-dir";
+          o += cls ? ('<span class="' + cls + '">' + esc(w) + "</span>") : esc(w);
+          i = k; continue;
+        }
+        if (/[0-9]/.test(c)) {
+          var num = "", k2 = i;
+          while (k2 < n && /[0-9a-fA-FxXob]/.test(line[k2])) { num += line[k2]; k2++; }
+          o += '<span class="t-num">' + esc(num) + "</span>"; i = k2; continue;
+        }
+        o += esc(c); i++;
+      }
+      return o;
+    }
+
+    var BASIC_KW = {};
+    ("REM PRINT LET INPUT IF THEN ELSE ELSEIF ENDIF FOR TO STEP NEXT WHILE WEND " +
+     "GOTO GOSUB RETURN END STOP AND OR NOT MOD")
+      .split(" ").forEach(function (k) { BASIC_KW[k] = 1; });
+    var BASIC_FN = {};
+    ("ABS INT SGN SQR SIN COS TAN RND LEN LEFT RIGHT MID STR VAL CHR ASC UCASE LCASE PI TRUE FALSE")
+      .split(" ").forEach(function (k) { BASIC_FN[k] = 1; });
+
+    function hlBasic(line) {
+      var t = line.trim();
+      if (/^(REM\b|')/i.test(t)) return '<span class="t-cmt">' + esc(line) + "</span>";
+      var o = "", i = 0, n = line.length;
+      while (i < n) {
+        var c = line[i];
+        if (c === '"') { var j = i + 1, s = '"'; while (j < n && line[j] !== '"') { s += line[j]; j++; } if (j < n) { s += '"'; j++; } o += '<span class="t-str">' + esc(s) + "</span>"; i = j; continue; }
+        if (/[A-Za-z_]/.test(c)) {
+          var w = "", k = i; while (k < n && /[A-Za-z0-9_$]/.test(line[k])) { w += line[k]; k++; }
+          var uw = w.toUpperCase(), cls = null;
+          if (line[k] === ":") cls = "t-lbl";
+          else if (BASIC_KW[uw]) cls = "t-kw";
+          else if (BASIC_FN[uw]) cls = "t-fn";
+          o += cls ? ('<span class="' + cls + '">' + esc(w) + "</span>") : esc(w);
+          i = k; continue;
+        }
+        if (/[0-9]/.test(c)) { var num = "", k2 = i; while (k2 < n && /[0-9.]/.test(line[k2])) { num += line[k2]; k2++; } o += '<span class="t-num">' + esc(num) + "</span>"; i = k2; continue; }
+        o += esc(c); i++;
+      }
+      return o;
+    }
+
+    function hlBinary(line) {
+      var t = line.trim();
+      if (t[0] === "#") return '<span class="t-cmt">' + esc(line) + "</span>";
+      if (/^[01\s]+$/.test(line) && t.length) return '<span class="t-reg">' + esc(line) + "</span>";
+      if (/^0x[0-9a-fA-F]+$/.test(t)) return '<span class="t-num">' + esc(line) + "</span>";
+      if (/^-?\d+$/.test(t)) return '<span class="t-num">' + esc(line) + "</span>";
+      return '<span class="t-str">' + esc(line) + "</span>";
+    }
+
+    function highlight() {
+      var lines = ta.value.split("\n");
+      var fn = lang === "assembly" ? hlAsm : (lang === "basic" ? hlBasic : hlBinary);
+      var html = "";
+      for (var i = 0; i < lines.length; i++) {
+        try { html += fn(lines[i]); } catch (e) { html += esc(lines[i]); }
+        html += "\n";
+      }
+      hl.innerHTML = html;
+      var g = "";
+      for (var j = 1; j <= lines.length; j++) g += j + "\n";
+      gutter.textContent = g;
+      syncScroll();
+    }
+    function syncScroll() {
+      hl.scrollTop = ta.scrollTop; hl.scrollLeft = ta.scrollLeft;
+      gutter.scrollTop = ta.scrollTop;
+    }
+
+    // ---------------- binary toolkit (ported from PyForge) ----------------
+    function groupBits(bits) { return bits.length % 8 === 0 ? bits.match(/.{1,8}/g).join(" ") : bits; }
+    function charNote(n) {
+      if (n >= 0n && n <= 0x10ffffn) {
+        var cp = Number(n);
+        if (cp >= 32 && cp !== 127) { try { return "   char '" + String.fromCodePoint(cp) + "'"; } catch (e) {} }
+      }
+      return "";
+    }
+    function binaryLine(line, push) {
+      if (/^[01\s]+$/.test(line)) {
+        var bits = line.replace(/\s+/g, ""); if (!bits.length) return;
+        var value = BigInt("0b" + bits);
+        push("bits  " + groupBits(bits) + "\n");
+        push("  decimal " + value.toString() + "   hex 0x" + value.toString(16).toUpperCase() + "\n");
+        if (bits.length % 8 === 0) {
+          var decs = [], hexs = [], text = "";
+          for (var i = 0; i < bits.length; i += 8) {
+            var byte = parseInt(bits.slice(i, i + 8), 2);
+            decs.push(byte); hexs.push("0x" + byte.toString(16).toUpperCase().padStart(2, "0"));
+            text += String.fromCodePoint(byte);
+          }
+          push("  text \"" + text + "\"\n");
+          push("  bytes " + decs.join(" ") + "   " + hexs.join(" ") + "\n");
+        } else { push("  (" + bits.length + " bits — not a multiple of 8, no text decode)\n"); }
+        return;
+      }
+      if (/^0x[0-9a-fA-F]+$/.test(line)) {
+        var n = BigInt(line);
+        push("hex   " + line + "\n");
+        push("  decimal " + n.toString() + "   binary 0b" + n.toString(2) + charNote(n) + "\n"); return;
+      }
+      if (/^-?\d+$/.test(line)) {
+        var n2 = BigInt(line), mag = n2 < 0n ? -n2 : n2;
+        push("number " + line + "\n");
+        push("  binary 0b" + mag.toString(2) + "   hex 0x" + mag.toString(16).toUpperCase() + charNote(n2) + "\n"); return;
+      }
+      var textv = line, m = line.match(/^(['"])([\s\S]*)\1$/); if (m) textv = m[2];
+      var bins = [], hexs2 = [], decs2 = [];
+      for (var ch of textv) {
+        var cp = ch.codePointAt(0), b = cp.toString(2);
+        bins.push(b.padStart(Math.ceil(b.length / 8) * 8, "0"));
+        hexs2.push("0x" + cp.toString(16).toUpperCase().padStart(2, "0")); decs2.push(cp);
+      }
+      push("text  \"" + textv + "\"\n");
+      push("  binary  " + bins.join(" ") + "\n");
+      push("  hex " + hexs2.join(" ") + "   decimal " + decs2.join(" ") + "\n");
+    }
+    function runBinaryText(input) {
+      var buf = [], push = function (s) { buf.push(s); };
+      var lines = input.split(/\r?\n/), did = false;
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line[0] === "#") continue;
+        did = true;
+        try { binaryLine(line, push); } catch (e) { push("? couldn't parse: " + line + "\n"); }
+      }
+      if (!did) push("(nothing to convert)\n");
+      return buf.join("");
+    }
+
+    // ---------------- registers panel ----------------
+    var REG_ORDER = ["rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","r8","r9","r10","r11","r12","r13","r14","r15"];
+    var lastRegs = {};
+    function hex64(v) { var s = v.toString(16); while (s.length < 16) s = "0" + s; return "0x" + s; }
+    function buildRegGrid() {
+      var g = document.getElementById("reg-grid"); g.innerHTML = "";
+      REG_ORDER.forEach(function (r) {
+        var d = document.createElement("div"); d.className = "reg"; d.id = "reg-" + r;
+        d.innerHTML = '<span class="rn">' + r + '</span><span class="rv">0x0000000000000000</span>';
+        g.appendChild(d);
+      });
+    }
+    function renderRegs(res) {
+      var note = document.getElementById("cpu-note");
+      if (!res || !res.regs) { note.textContent = "n/a"; return; }
+      note.textContent = "halted";
+      REG_ORDER.forEach(function (r) {
+        var v = res.regs[r] || 0n;
+        var el = document.getElementById("reg-" + r);
+        var changed = lastRegs[r] !== undefined && lastRegs[r] !== v;
+        el.className = "reg" + (v !== 0n ? " nz" : "") + (changed ? " changed" : "");
+        el.querySelector(".rv").textContent = hex64(v);
+        lastRegs[r] = v;
+      });
+      var f = document.getElementById("flags"); f.innerHTML = "";
+      ["ZF","SF","CF","OF"].forEach(function (name) {
+        var on = res.flags && res.flags[name];
+        var s = document.createElement("span"); s.className = "flag" + (on ? " set" : ""); s.textContent = name;
+        f.appendChild(s);
+      });
+      document.getElementById("steps").innerHTML = "executed <b>" + (res.steps || 0) + "</b> instructions";
+    }
+    function resetRegs() {
+      lastRegs = {};
+      REG_ORDER.forEach(function (r) {
+        var el = document.getElementById("reg-" + r);
+        el.className = "reg"; el.querySelector(".rv").textContent = "0x0000000000000000";
+      });
+      document.getElementById("flags").innerHTML = "";
+      document.getElementById("cpu-note").textContent = "idle";
+      document.getElementById("steps").innerHTML = "executed <b>0</b> instructions";
+    }
+
+    // ---------------- reference cards ----------------
+    var REFS = {
+      assembly: {
+        title: "x86-64 quick reference",
+        html:
+          "<h4>Registers</h4><p>16 GPRs: <code>rax rbx rcx rdx rsi rdi rbp rsp r8-r15</code>. Use 32-bit names (<code>eax</code>) or 8-bit (<code>al</code>) for sub-parts.</p>" +
+          "<h4>Common instructions</h4><table>" +
+          "<tr><td>mov d, s</td><td>copy s into d</td></tr>" +
+          "<tr><td>add / sub</td><td>d = d +/- s</td></tr>" +
+          "<tr><td>imul / idiv</td><td>signed multiply / divide</td></tr>" +
+          "<tr><td>inc / dec</td><td>d +/- 1</td></tr>" +
+          "<tr><td>and or xor</td><td>bitwise; <code>xor r,r</code> zeroes r</td></tr>" +
+          "<tr><td>cmp a, b</td><td>set flags from a - b</td></tr>" +
+          "<tr><td>jmp / je / jne</td><td>jump (always / if ZF / if !ZF)</td></tr>" +
+          "<tr><td>jg jl jge jle</td><td>signed conditional jumps</td></tr>" +
+          "<tr><td>push / pop</td><td>stack via rsp</td></tr>" +
+          "</table>" +
+          "<h4>Syscalls (Linux ABI)</h4><table>" +
+          "<tr><td>rax=1</td><td>write(rdi, rsi, rdx)</td></tr>" +
+          "<tr><td>rax=0</td><td>read(rdi, rsi, rdx)</td></tr>" +
+          "<tr><td>rax=60</td><td>exit(rdi)</td></tr>" +
+          "</table>" +
+          "<p>Entry label is <code>_start</code> (or <code>main</code>). Data goes in <code>section .data</code> with <code>db/dw/dd/dq</code>.</p>"
+      },
+      binary: {
+        title: "Binary toolkit",
+        html:
+          "<p>Put one item per line — each line is decoded or encoded automatically:</p>" +
+          "<table>" +
+          "<tr><td>01001000</td><td>bits &rarr; number + text</td></tr>" +
+          "<tr><td>72</td><td>decimal &rarr; binary + hex</td></tr>" +
+          "<tr><td>0x48</td><td>hex &rarr; decimal + binary</td></tr>" +
+          "<tr><td>\"Hi\"</td><td>text &rarr; binary + hex</td></tr>" +
+          "</table>" +
+          "<p>Group bits in 8s to decode them as ASCII bytes. Lines starting with <code>#</code> are comments.</p>"
+      },
+      basic: {
+        title: "BASIC reference",
+        html:
+          "<h4>Statements</h4><table>" +
+          "<tr><td>PRINT a, b</td><td>comma = tab, ; = no newline</td></tr>" +
+          "<tr><td>LET x = ...</td><td>(LET optional)</td></tr>" +
+          "<tr><td>INPUT \"q\"; v</td><td>read a line of stdin</td></tr>" +
+          "<tr><td>IF ... THEN</td><td>... ELSEIF ... ELSE ... ENDIF</td></tr>" +
+          "<tr><td>FOR i = a TO b</td><td>[STEP s] ... NEXT i</td></tr>" +
+          "<tr><td>WHILE c ... WEND</td><td>loop while c</td></tr>" +
+          "<tr><td>GOTO name</td><td>jump to a <code>name:</code> label</td></tr>" +
+          "</table>" +
+          "<h4>Functions</h4><p><code>ABS INT SGN SQR SIN COS TAN RND LEN LEFT RIGHT MID STR VAL CHR ASC UCASE LCASE</code> · constants <code>PI TRUE FALSE</code>.</p>"
+      }
+    };
+    function renderRef() {
+      document.getElementById("ref-title").textContent = REFS[lang].title;
+      document.getElementById("ref").innerHTML = REFS[lang].html;
+      document.getElementById("cpu-card").style.display = lang === "assembly" ? "" : "none";
+    }
+
+    // ---------------- run ----------------
+    function setStatus(txt, cls) { statusEl.textContent = txt; statusEl.style.color = cls || ""; }
+    function run() {
+      var code = ta.value, stdin = stdinEl.value;
+      out.textContent = "";
+      var t0 = (window.performance && performance.now) ? performance.now() : 0;
+      try {
+        if (lang === "assembly") {
+          resetRegs();
+          var r = window.PFAsm.run(code, stdin || "");
+          out.textContent = r.out || "";
+          renderRegs(r);
+        } else if (lang === "basic") {
+          var rb = window.PFBasic.run(code, stdin || "");
+          out.textContent = rb.out || "";
+        } else {
+          out.textContent = runBinaryText(code);
+        }
+        var dt = t0 ? " · " + Math.max(1, Math.round(performance.now() - t0)) + "ms" : "";
+        setStatus("done" + dt, "var(--green)");
+      } catch (e) {
+        out.innerHTML = '<span class="err">runtime error: ' + esc(String((e && e.message) || e)) + "</span>";
+        setStatus("error", "var(--red)");
+      }
+      out.scrollTop = out.scrollHeight;
+    }
+
+    // ---------------- language switching + persistence ----------------
+    function saveKey() { return "pyforge-asm-code-" + lang; }
+    function loadCode() {
+      var saved = null;
+      try { saved = localStorage.getItem(saveKey()); } catch (e) {}
+      ta.value = (saved !== null && saved !== "") ? saved : STARTERS[lang];
+    }
+    function persist() { try { localStorage.setItem(saveKey(), ta.value); } catch (e) {} }
+
+    function fillExamples() {
+      var sel = document.getElementById("examples");
+      sel.innerHTML = "";
+      var opt0 = document.createElement("option");
+      opt0.value = ""; opt0.textContent = "Examples…"; sel.appendChild(opt0);
+      Object.keys(EXAMPLES[lang]).forEach(function (name) {
+        var o = document.createElement("option"); o.value = name; o.textContent = name; sel.appendChild(o);
+      });
+    }
+
+    function setLang(l) {
+      persist();
+      lang = l;
+      var tabs = document.querySelectorAll(".tab");
+      for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle("active", tabs[i].getAttribute("data-lang") === l);
+      resetRegs();
+      renderRef();
+      fillExamples();
+      loadCode();
+      highlight();
+      out.textContent = "";
+      setStatus("ready");
+    }
+
+    // ---------------- wiring ----------------
+    (function () {
+      var tabs = document.querySelectorAll(".tab");
+      for (var i = 0; i < tabs.length; i++) {
+        (function (b) { b.addEventListener("click", function () { setLang(b.getAttribute("data-lang")); }); })(tabs[i]);
+      }
+    })();
+    document.getElementById("btn-run").addEventListener("click", run);
+    document.getElementById("btn-clear").addEventListener("click", function () {
+      ta.value = ""; highlight(); persist(); ta.focus();
+    });
+    document.getElementById("examples").addEventListener("change", function (e) {
+      var name = e.target.value; if (!name) return;
+      ta.value = EXAMPLES[lang][name]; highlight(); persist();
+      e.target.value = ""; ta.focus();
+    });
+    document.getElementById("btn-stdin").addEventListener("click", function () {
+      var w = document.getElementById("stdin-wrap");
+      var open = w.classList.toggle("collapsed") === false;
+      this.classList.toggle("on", open);
+      this.innerHTML = open ? "stdin &#9652;" : "stdin &#9662;";
+      if (open) stdinEl.focus();
+    });
+
+    ta.addEventListener("input", function () { highlight(); persist(); });
+    ta.addEventListener("scroll", syncScroll);
+    ta.addEventListener("keydown", function (e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); run(); return; }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        var s = ta.selectionStart, en = ta.selectionEnd;
+        ta.value = ta.value.slice(0, s) + "    " + ta.value.slice(en);
+        ta.selectionStart = ta.selectionEnd = s + 4;
+        highlight(); persist();
+      }
+    });
+
+    // ---------------- init ----------------
+    buildRegGrid();
+    setLang("assembly");
+    ta.focus();
+  })();
+  </script>
+</body>
+</html>
