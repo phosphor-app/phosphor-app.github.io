@@ -839,9 +839,12 @@
       push("  binary  " + bins.join(" ") + "\n");
       push("  hex " + hexs2.join(" ") + "   decimal " + decs2.join(" ") + "\n");
     }
-    function runBinaryText(input) {
+    function runBinaryText(input, stdin) {
+      // If you typed something in the stdin box, convert THAT (your "input");
+      // otherwise convert whatever is in the editor.
+      var source = (stdin && stdin.trim()) ? stdin : input;
       var buf = [], push = function (s) { buf.push(s); };
-      var lines = input.split(/\r?\n/), did = false;
+      var lines = source.split(/\r?\n/), did = false;
       for (var i = 0; i < lines.length; i++) {
         var line = lines[i].trim();
         if (!line || line[0] === "#") continue;
@@ -1015,7 +1018,7 @@
           var rb = window.PFBasic.run(code, stdin || "");
           out.textContent = rb.out || "";
         } else {
-          out.textContent = runBinaryText(code);
+          out.textContent = runBinaryText(code, stdin);
         }
         var dt = t0 ? " · " + Math.max(1, Math.round(performance.now() - t0)) + "ms" : "";
         setStatus("done" + dt, "var(--green)");
