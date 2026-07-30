@@ -171,6 +171,8 @@
     text-transform: uppercase; letter-spacing: 1.6px; color: var(--dim);
   }
   .io-head .status { color: var(--faint); letter-spacing: 0.5px; text-transform: none; font-weight: 500; }
+  .io-actions { display: flex; align-items: center; gap: 8px; }
+  #output.collapsed { display: none; }
   .stdin-wrap { border-top: 1px solid var(--border); background: #090b11; }
   .stdin-wrap.collapsed { display: none; }
   #stdin {
@@ -289,7 +291,11 @@
 
       <div class="io-head">
         <span>Output</span>
-        <span class="status" id="status">ready</span>
+        <div class="io-actions">
+          <span class="status" id="status">ready</span>
+          <button class="mini" id="btn-clear-out" title="Clear the output">Clear</button>
+          <button class="mini" id="btn-hide-out" title="Hide the output">Hide</button>
+        </div>
       </div>
       <pre id="output"></pre>
     </section>
@@ -799,6 +805,10 @@
     function setStatus(txt, cls) { statusEl.textContent = txt; statusEl.style.color = cls || ""; }
     function run() {
       var code = ta.value, stdin = stdinEl.value;
+      if (out.classList.contains("collapsed")) {
+        out.classList.remove("collapsed");
+        var hb = document.getElementById("btn-hide-out"); hb.textContent = "Hide"; hb.classList.remove("on");
+      }
       out.textContent = "";
       var t0 = (window.performance && performance.now) ? performance.now() : 0;
       try {
@@ -870,6 +880,14 @@
       var name = e.target.value; if (!name) return;
       ta.value = EXAMPLES[lang][name]; highlight(); persist();
       e.target.value = ""; ta.focus();
+    });
+    document.getElementById("btn-clear-out").addEventListener("click", function () {
+      out.textContent = ""; setStatus("ready");
+    });
+    document.getElementById("btn-hide-out").addEventListener("click", function () {
+      var collapsed = out.classList.toggle("collapsed");
+      this.textContent = collapsed ? "Show" : "Hide";
+      this.classList.toggle("on", collapsed);
     });
     document.getElementById("btn-stdin").addEventListener("click", function () {
       var w = document.getElementById("stdin-wrap");
