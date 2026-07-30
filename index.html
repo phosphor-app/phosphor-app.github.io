@@ -287,7 +287,7 @@
         <button class="mini" id="btn-stdin" title="Give the program standard input">stdin &#9662;</button>
       </div>
       <div class="stdin-wrap collapsed" id="stdin-wrap">
-        <textarea id="stdin" spellcheck="false" placeholder="Standard input — what the program reads (assembly sys_read, BASIC INPUT)…"></textarea>
+        <textarea id="stdin" spellcheck="false" placeholder="Type your input, then press Enter to run (Shift+Enter for a new line)…"></textarea>
       </div>
 
       <div class="io-head">
@@ -941,6 +941,11 @@
       this.classList.toggle("on", open);
       this.innerHTML = open ? "stdin &#9652;" : "stdin &#9662;";
       if (open) stdinEl.focus();
+    });
+    // Enter in the stdin box runs the program (like submitting a prompt);
+    // Shift+Enter still adds a new line for multi-line input.
+    stdinEl.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); run(); }
     });
 
     ta.addEventListener("input", function () { highlight(); persist(); });
