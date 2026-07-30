@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>PyForge ASM — Assembly, Binary &amp; BASIC in your browser</title>
+<title>Phosphor — Assembly, Binary &amp; BASIC in your browser</title>
 <meta name="description" content="A bare-metal code playground. Write and run x86-64 assembly, decode binary, and run BASIC — entirely in your browser, no install." />
 <style>
   :root {
@@ -248,7 +248,7 @@
 <body>
   <header>
     <div class="brand">
-      <span class="logo"><span class="caret">&gt;_</span> PyForge</span>
+      <span class="logo"><span class="caret">&gt;_</span> Phosphor</span>
       <span class="badge">ASM</span>
     </div>
     <p class="tagline">
@@ -310,7 +310,7 @@
   </main>
 
   <footer>
-    <div>Part of <a href="https://github.com/pyforge-app/pyforge">PyForge</a> — a free, open code editor.</div>
+    <div>Phosphor — a free, open playground for low-level code. <a href="https://github.com/pyforge-app/pyforge">Source on GitHub</a>.</div>
     <div class="mono">Ctrl / <kbd>&#8984;</kbd> + <kbd>Enter</kbd> to run · Tab inserts spaces · code is saved in your browser</div>
   </footer>
 
@@ -331,10 +331,10 @@
     // ---------------- starter programs ----------------
     var STARTERS = {
       assembly: [
-        "; x86-64 assembly (NASM syntax) — runs in PyForge's software CPU.",
+        "; x86-64 assembly (NASM syntax) — runs in Phosphor's software CPU.",
         "; Registers on the right update after every run.",
         "section .data",
-        "    msg db \"Hello from PyForge!\", 0xa",
+        "    msg db \"Hello from Phosphor!\", 0xa",
         "    len equ $ - msg",
         "",
         "section .text",
@@ -358,7 +358,7 @@
         "01001000 01101001 00100001",
         "72",
         "0x41",
-        "\"PyForge\"",
+        "\"Phosphor\"",
         ""
       ].join("\n"),
       basic: [
@@ -366,7 +366,7 @@
         "FOR i = 1 TO 5",
         "    PRINT i, \"squared is\", i * i",
         "NEXT i",
-        "PRINT \"Hello from PyForge!\"",
+        "PRINT \"Hello from Phosphor!\"",
         ""
       ].join("\n")
     };
@@ -457,14 +457,14 @@
         "Bits, number, hex, text": STARTERS.binary,
         "Decode a hidden message": [
           "# Each 8-bit group is one letter — run to reveal it.",
-          "01010000 01111001 01000110",
-          "01101111 01110010 01100111 01100101",
+          "01010000 01101000 01101111 01110011",
+          "01110000 01101000 01101111 01110010",
           ""
         ].join("\n"),
         "Encode your name": [
           "# Text -> binary + hex.  Change the word and run.",
           "\"assembly\"",
-          "\"PyForge rules\"",
+          "\"Phosphor rules\"",
           ""
         ].join("\n"),
         "Number bases": [
@@ -823,7 +823,7 @@
     }
 
     // ---------------- language switching + persistence ----------------
-    function saveKey() { return "pyforge-asm-code-" + lang; }
+    function saveKey() { return "phosphor-code-" + lang; }
     function loadCode() {
       var saved = null;
       try { saved = localStorage.getItem(saveKey()); } catch (e) {}
