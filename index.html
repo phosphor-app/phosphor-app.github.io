@@ -266,6 +266,7 @@
     <section class="card editor-col">
       <div class="tabs">
         <button class="tab active" data-lang="assembly">Assembly</button>
+        <button class="tab" data-lang="mos6502">6502</button>
         <button class="tab" data-lang="binary">Binary</button>
         <button class="tab" data-lang="basic">BASIC</button>
         <span class="spacer"></span>
@@ -323,6 +324,7 @@
 
   <script src="asm.js"></script>
   <script src="basic.js"></script>
+  <script src="mos6502.js"></script>
   <script>
   (function () {
     "use strict";
@@ -374,6 +376,20 @@
         "    PRINT i, \"squared is\", i * i",
         "NEXT i",
         "PRINT \"Hello from Phosphor!\"",
+        ""
+      ].join("\n"),
+      mos6502: [
+        "; 6502 assembly — the CPU from the NES, C64 and Apple II.",
+        "; Store a byte to $F001 to print it. Registers update on the right.",
+        "        LDX #$00        ; index = 0",
+        "print:  LDA msg,X       ; load the next character",
+        "        BEQ done        ; a 0 byte marks the end of the string",
+        "        STA $F001       ; print the character",
+        "        INX",
+        "        JMP print",
+        "done:   BRK             ; stop the CPU",
+        "",
+        "msg:    .byte \"Hello from Phosphor!\", $0A, $00",
         ""
       ].join("\n")
     };
@@ -576,6 +592,61 @@
           "PRINT \"pi        =\", PI",
           ""
         ].join("\n")
+      },
+      mos6502: {
+        "Hello world": STARTERS.mos6502,
+        "Add two numbers (watch A)": [
+          "; A ends up holding 5 + 3 = 8 — watch the A register.",
+          "        LDA #$05",
+          "        CLC          ; clear carry before an add",
+          "        ADC #$03     ; A = A + 3",
+          "        STA $10      ; store the result at zero-page $10",
+          "        BRK",
+          ""
+        ].join("\n"),
+        "Count 1 to 5 (loop)": [
+          "        LDX #$01",
+          "loop:   TXA          ; move X into A",
+          "        CLC",
+          "        ADC #$30     ; turn the number into an ASCII digit",
+          "        STA $F001    ; print the digit",
+          "        LDA #$0A",
+          "        STA $F001    ; print a newline",
+          "        INX",
+          "        CPX #$06",
+          "        BNE loop     ; loop until X reaches 6",
+          "        BRK",
+          ""
+        ].join("\n"),
+        "Ask your name ($F004)": [
+          "; Type a name in the stdin box, then press Enter.",
+          "        LDX #$00",
+          "greet:  LDA hello,X    ; print \"Hello, \"",
+          "        BEQ readloop",
+          "        STA $F001",
+          "        INX",
+          "        JMP greet",
+          "readloop:",
+          "        LDA $F004      ; read a character from stdin",
+          "        BEQ done       ; 0 = end of input",
+          "        STA $F001      ; echo it back",
+          "        JMP readloop",
+          "done:   BRK",
+          "",
+          "hello:  .byte \"Hello, \", $00",
+          ""
+        ].join("\n"),
+        "SHOUT (uppercase with AND)": [
+          "; Reads a word from stdin and prints it in CAPS.",
+          "; Clearing bit 5 (AND #$DF) turns a lowercase letter uppercase.",
+          "loop:   LDA $F004      ; read a character",
+          "        BEQ done       ; 0 = end",
+          "        AND #$DF       ; force uppercase",
+          "        STA $F001      ; print it",
+          "        JMP loop",
+          "done:   BRK",
+          ""
+        ].join("\n")
       }
     };
 
@@ -628,6 +699,40 @@
       return o;
     }
 
+    var MOS_INS = {};
+    ("lda ldx ldy sta stx sty tax tay txa tya tsx txs pha pla php plp adc sbc and ora eor bit " +
+     "inc dec inx dex iny dey asl lsr rol ror cmp cpx cpy jmp jsr rts rti brk nop " +
+     "clc sec cli sei clv cld sed bcc bcs beq bne bmi bpl bvc bvs").split(" ").forEach(function (m) { MOS_INS[m] = 1; });
+    var MOS_DIR = { byte: 1, word: 1, db: 1, dw: 1, dcb: 1, org: 1 };
+
+    function hl6502(line) {
+      var o = "", i = 0, n = line.length;
+      while (i < n) {
+        var c = line[i];
+        if (c === ";") { o += '<span class="t-cmt">' + esc(line.slice(i)) + "</span>"; return o; }
+        if (c === '"') { var j = i + 1, s = '"'; while (j < n && line[j] !== '"') { s += line[j]; j++; } if (j < n) { s += '"'; j++; } o += '<span class="t-str">' + esc(s) + "</span>"; i = j; continue; }
+        if (c === "#" || c === "$" || c === "%") {
+          var num = c, k = i + 1;
+          while (k < n && /[0-9a-fA-F$%<>]/.test(line[k])) { num += line[k]; k++; }
+          o += '<span class="t-num">' + esc(num) + "</span>"; i = k; continue;
+        }
+        if (/[A-Za-z_.]/.test(c)) {
+          var w = "", k2 = i;
+          while (k2 < n && /[A-Za-z0-9_.]/.test(line[k2])) { w += line[k2]; k2++; }
+          var lw = w.toLowerCase().replace(/^\./, ""), cls = null;
+          if (line[k2] === ":") cls = "t-lbl";
+          else if (MOS_INS[w.toLowerCase()]) cls = "t-ins";
+          else if (w[0] === "." && MOS_DIR[lw]) cls = "t-dir";
+          else if (/^[AXYaxy]$/.test(w)) cls = "t-reg";
+          o += cls ? ('<span class="' + cls + '">' + esc(w) + "</span>") : esc(w);
+          i = k2; continue;
+        }
+        if (/[0-9]/.test(c)) { var d = "", k3 = i; while (k3 < n && /[0-9]/.test(line[k3])) { d += line[k3]; k3++; } o += '<span class="t-num">' + esc(d) + "</span>"; i = k3; continue; }
+        o += esc(c); i++;
+      }
+      return o;
+    }
+
     var BASIC_KW = {};
     ("REM PRINT LET INPUT IF THEN ELSE ELSEIF ENDIF FOR TO STEP NEXT WHILE WEND " +
      "GOTO GOSUB RETURN END STOP AND OR NOT MOD")
@@ -669,7 +774,7 @@
 
     function highlight() {
       var lines = ta.value.split("\n");
-      var fn = lang === "assembly" ? hlAsm : (lang === "basic" ? hlBasic : hlBinary);
+      var fn = lang === "assembly" ? hlAsm : lang === "mos6502" ? hl6502 : (lang === "basic" ? hlBasic : hlBinary);
       var html = "";
       for (var i = 0; i < lines.length; i++) {
         try { html += fn(lines[i]); } catch (e) { html += esc(lines[i]); }
@@ -747,43 +852,58 @@
       return buf.join("");
     }
 
-    // ---------------- registers panel ----------------
-    var REG_ORDER = ["rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","r8","r9","r10","r11","r12","r13","r14","r15"];
+    // ---------------- CPU register panel (x86 and 6502) ----------------
+    var CPU = {
+      assembly: { regs: ["rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","r8","r9","r10","r11","r12","r13","r14","r15"],
+                  flags: ["ZF","SF","CF","OF"] },
+      mos6502:  { regs: ["A","X","Y","SP","PC"], flags: ["N","V","B","D","I","Z","C"] }
+    };
+    function isCPU(l) { return l === "assembly" || l === "mos6502"; }
     var lastRegs = {};
+    function hexn(v, w) { var s = (v >>> 0).toString(16); while (s.length < w) s = "0" + s; return s; }
     function hex64(v) { var s = v.toString(16); while (s.length < 16) s = "0" + s; return "0x" + s; }
-    function buildRegGrid() {
+    function regZero(l) { return l === "mos6502" ? "$00" : "0x0000000000000000"; }
+    function fmtReg(l, name, v) {
+      if (l !== "mos6502") return hex64(v);
+      if (name === "PC") return "$" + hexn(v, 4);
+      if (name === "SP") return "$01" + hexn(v, 2);
+      return "$" + hexn(v, 2);
+    }
+    function buildRegGrid(l) {
       var g = document.getElementById("reg-grid"); g.innerHTML = "";
-      REG_ORDER.forEach(function (r) {
+      CPU[l].regs.forEach(function (r) {
         var d = document.createElement("div"); d.className = "reg"; d.id = "reg-" + r;
-        d.innerHTML = '<span class="rn">' + r + '</span><span class="rv">0x0000000000000000</span>';
+        d.innerHTML = '<span class="rn">' + r + '</span><span class="rv">' + regZero(l) + "</span>";
         g.appendChild(d);
       });
     }
-    function renderRegs(res) {
+    function renderRegs(res, l) {
       var note = document.getElementById("cpu-note");
       if (!res || !res.regs) { note.textContent = "n/a"; return; }
       note.textContent = "halted";
-      REG_ORDER.forEach(function (r) {
-        var v = res.regs[r] || 0n;
-        var el = document.getElementById("reg-" + r);
+      var zero = l === "mos6502" ? 0 : 0n;
+      CPU[l].regs.forEach(function (r) {
+        var v = res.regs[r]; if (v === undefined) v = zero;
+        var el = document.getElementById("reg-" + r); if (!el) return;
         var changed = lastRegs[r] !== undefined && lastRegs[r] !== v;
-        el.className = "reg" + (v !== 0n ? " nz" : "") + (changed ? " changed" : "");
-        el.querySelector(".rv").textContent = hex64(v);
+        var nz = l === "mos6502" ? (v !== 0) : (v !== 0n);
+        el.className = "reg" + (nz ? " nz" : "") + (changed ? " changed" : "");
+        el.querySelector(".rv").textContent = fmtReg(l, r, v);
         lastRegs[r] = v;
       });
       var f = document.getElementById("flags"); f.innerHTML = "";
-      ["ZF","SF","CF","OF"].forEach(function (name) {
+      CPU[l].flags.forEach(function (name) {
         var on = res.flags && res.flags[name];
         var s = document.createElement("span"); s.className = "flag" + (on ? " set" : ""); s.textContent = name;
         f.appendChild(s);
       });
       document.getElementById("steps").innerHTML = "executed <b>" + (res.steps || 0) + "</b> instructions";
     }
-    function resetRegs() {
+    function resetRegs(l) {
       lastRegs = {};
-      REG_ORDER.forEach(function (r) {
-        var el = document.getElementById("reg-" + r);
-        el.className = "reg"; el.querySelector(".rv").textContent = "0x0000000000000000";
+      CPU[l].regs.forEach(function (r) {
+        var el = document.getElementById("reg-" + r); if (!el) return;
+        el.className = "reg"; el.querySelector(".rv").textContent = regZero(l);
       });
       document.getElementById("flags").innerHTML = "";
       document.getElementById("cpu-note").textContent = "idle";
@@ -813,6 +933,29 @@
           "<tr><td>rax=60</td><td>exit(rdi)</td></tr>" +
           "</table>" +
           "<p>Entry label is <code>_start</code> (or <code>main</code>). Data goes in <code>section .data</code> with <code>db/dw/dd/dq</code>.</p>"
+      },
+      mos6502: {
+        title: "6502 quick reference",
+        html:
+          "<h4>Registers</h4><p><code>A</code> accumulator · <code>X</code>, <code>Y</code> index · <code>SP</code> stack · <code>PC</code> program counter. All 8-bit (PC is 16-bit).</p>" +
+          "<h4>Common instructions</h4><table>" +
+          "<tr><td>LDA / LDX / LDY</td><td>load a register</td></tr>" +
+          "<tr><td>STA / STX / STY</td><td>store a register to memory</td></tr>" +
+          "<tr><td>ADC / SBC</td><td>add / subtract with carry</td></tr>" +
+          "<tr><td>INX INY DEX DEY</td><td>inc / dec X or Y</td></tr>" +
+          "<tr><td>AND ORA EOR</td><td>bitwise on A</td></tr>" +
+          "<tr><td>CMP CPX CPY</td><td>compare (sets flags)</td></tr>" +
+          "<tr><td>BEQ BNE BCC BCS</td><td>branch on Z / carry</td></tr>" +
+          "<tr><td>JMP / JSR / RTS</td><td>jump / call / return</td></tr>" +
+          "<tr><td>BRK</td><td>stop the program</td></tr>" +
+          "</table>" +
+          "<h4>Addressing</h4><table>" +
+          "<tr><td>#$0A</td><td>immediate (the value 10)</td></tr>" +
+          "<tr><td>$10</td><td>zero page address</td></tr>" +
+          "<tr><td>$0200</td><td>absolute address</td></tr>" +
+          "<tr><td>label,X</td><td>indexed by X</td></tr>" +
+          "</table>" +
+          "<h4>Screen &amp; keyboard</h4><p>Store a byte to <code>$F001</code> to <b>print</b> a character. Read <code>$F004</code> to get the next <b>input</b> byte (0 at end).</p>"
       },
       binary: {
         title: "Binary toolkit",
@@ -844,7 +987,7 @@
     function renderRef() {
       document.getElementById("ref-title").textContent = REFS[lang].title;
       document.getElementById("ref").innerHTML = REFS[lang].html;
-      document.getElementById("cpu-card").style.display = lang === "assembly" ? "" : "none";
+      document.getElementById("cpu-card").style.display = isCPU(lang) ? "" : "none";
     }
 
     // ---------------- run ----------------
@@ -859,10 +1002,15 @@
       var t0 = (window.performance && performance.now) ? performance.now() : 0;
       try {
         if (lang === "assembly") {
-          resetRegs();
+          resetRegs(lang);
           var r = window.PFAsm.run(code, stdin || "");
           out.textContent = r.out || "";
-          renderRegs(r);
+          renderRegs(r, lang);
+        } else if (lang === "mos6502") {
+          resetRegs(lang);
+          var r6 = window.PF6502.run(code, stdin || "");
+          out.textContent = r6.out || "";
+          renderRegs(r6, lang);
         } else if (lang === "basic") {
           var rb = window.PFBasic.run(code, stdin || "");
           out.textContent = rb.out || "";
@@ -902,7 +1050,7 @@
       lang = l;
       var tabs = document.querySelectorAll(".tab");
       for (var i = 0; i < tabs.length; i++) tabs[i].classList.toggle("active", tabs[i].getAttribute("data-lang") === l);
-      resetRegs();
+      if (isCPU(lang)) { buildRegGrid(lang); resetRegs(lang); }
       renderRef();
       fillExamples();
       loadCode();
@@ -962,7 +1110,6 @@
     });
 
     // ---------------- init ----------------
-    buildRegGrid();
     setLang("assembly");
     ta.focus();
   })();
